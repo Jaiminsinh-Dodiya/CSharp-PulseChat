@@ -10,14 +10,14 @@ using PulseChatClient.Services;
 
 namespace PulseChatClient.Forms
 {
-    public class ChatForm : Form
+    public partial class ChatForm : Form
     {
         private ChatService _chatService;
         private string _username;
 
         // Active conversation state
-        private string _activeChatType = "group";   // "group" or "private"
-        private string _activeChatId = "1";          // group ID or username
+        private string _activeChatType = "group";
+        private string _activeChatId = "1";
         private string _activeChatName = "General";
         private string _activeChatColor = "#8A60FF";
 
@@ -26,21 +26,8 @@ namespace PulseChatClient.Forms
         private List<string> _onlineUsers = new List<string>();
         private HashSet<string> _unreadChats = new HashSet<string>();
         private Dictionary<string, Image> _imageCache = new Dictionary<string, Image>();
-        // (startPos, endPos, serverPath, originalFileName) for clickable download links
         private List<Tuple<int, int, string, string>> _fileLinks = new List<Tuple<int, int, string, string>>();
         private bool _isRefreshing = false;
-
-        // ==================== UI CONTROLS ====================
-        private Panel pnlHeader, pnlSidebar, pnlChatHeader, pnlInput;
-        private RichTextBox rtbChat;
-        private TextBox txtMessage;
-        private Button btnSend, btnAttach;
-        private ListBox lstGroups, lstUsers;
-        private Label lblLogo, lblStatus, lblUser;
-        private Label lblGroupsTitle, lblDirectTitle;
-        private Label lblChatName, lblChatInfo;
-        private Panel pnlStatusDot, pnlChatDot;
-        private Button btnCreateGroup, btnBrowseGroups;
 
         // ==================== COLORS ====================
         private readonly Color BgDarkest = Color.FromArgb(15, 15, 22);
@@ -68,70 +55,44 @@ namespace PulseChatClient.Forms
         {
             _username = "Designer";
             _chatService = null;
-            BuildUI();
+            InitializeComponent();
         }
 
         public ChatForm(ChatService chatService, string username)
         {
             _chatService = chatService;
             _username = username;
-            BuildUI();
+            InitializeComponent();
+            this.Text = $"PulseChat — {_username}";
+            lblUser.Text = _username;
+            WireUpPaintEvents();
             SetupEventHandlers();
             LoadInitialData();
         }
 
-        // ==================== UI CONSTRUCTION ====================
+        // ==================== COSMETIC PAINT EVENTS ====================
 
-        private void BuildUI()
+        private void WireUpPaintEvents()
         {
-            this.SuspendLayout();
-            this.Text = $"PulseChat — {_username}";
-            this.ClientSize = new Size(960, 660);
-            this.MinimumSize = new Size(800, 520);
-            this.BackColor = BgDarkest;
-            this.Font = new Font("Segoe UI", 10F);
-            this.StartPosition = FormStartPosition.CenterScreen;
-            this.SetStyle(ControlStyles.OptimizedDoubleBuffer, true);
-
-            BuildHeader();
-            BuildSidebar();
-            BuildChatHeader();
-            BuildInputArea();
-            BuildChatArea();
-
-            // Dock order matters: add Fill last
-            this.Controls.Add(rtbChat);
-            this.Controls.Add(pnlChatHeader);
-            this.Controls.Add(pnlInput);
-            this.Controls.Add(pnlSidebar);
-            this.Controls.Add(pnlHeader);
-
-            this.ResumeLayout(false);
-        }
-
-        private void BuildHeader()
-        {
-            pnlHeader = new Panel { Dock = DockStyle.Top, Height = 50, BackColor = BgHeader };
             pnlHeader.Paint += (s, e) =>
             {
                 using (var pen = new Pen(BorderColor))
                     e.Graphics.DrawLine(pen, 0, 49, pnlHeader.Width, 49);
             };
-
-            lblLogo = new Label
+            pnlSidebar.Paint += (s, e) =>
             {
-                Text = "⚡ PulseChat",
-                Font = new Font("Segoe UI", 15F, FontStyle.Bold),
-                ForeColor = AccentPurple,
-                Location = new Point(14, 10),
-                AutoSize = true,
-                BackColor = Color.Transparent
+                using (var pen = new Pen(BorderColor))
+                    e.Graphics.DrawLine(pen, 229, 0, 229, pnlSidebar.Height);
             };
-
-            pnlStatusDot = new Panel
+            pnlChatHeader.Paint += (s, e) =>
             {
-                Size = new Size(10, 10),
-                BackColor = StatusGreen
+                using (var pen = new Pen(BorderColor))
+                    e.Graphics.DrawLine(pen, 0, 47, pnlChatHeader.Width, 47);
+            };
+            pnlInput.Paint += (s, e) =>
+            {
+                using (var pen = new Pen(BorderColor))
+                    e.Graphics.DrawLine(pen, 0, 0, pnlInput.Width, 0);
             };
             pnlStatusDot.Paint += (s, e) =>
             {
@@ -139,242 +100,41 @@ namespace PulseChatClient.Forms
                 using (var b = new SolidBrush(pnlStatusDot.BackColor))
                     e.Graphics.FillEllipse(b, 0, 0, 9, 9);
             };
-
-            lblStatus = new Label
-            {
-                Text = "Connected",
-                Font = new Font("Segoe UI", 8F),
-                ForeColor = StatusGreen,
-                AutoSize = true,
-                BackColor = Color.Transparent
-            };
-
-            lblUser = new Label
-            {
-                Text = _username,
-                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
-                ForeColor = TextSecondary,
-                AutoSize = true,
-                BackColor = Color.Transparent
-            };
-
-            pnlHeader.Controls.AddRange(new Control[] { lblLogo, pnlStatusDot, lblStatus, lblUser });
-
-            // Position on resize
-            pnlHeader.Resize += (s, e) =>
-            {
-                lblUser.Location = new Point(pnlHeader.Width - lblUser.Width - 18, 16);
-                pnlStatusDot.Location = new Point(pnlHeader.Width - lblUser.Width - lblStatus.Width - 48, 21);
-                lblStatus.Location = new Point(pnlHeader.Width - lblUser.Width - lblStatus.Width - 34, 17);
-            };
-        }
-
-        private void BuildSidebar()
-        {
-            pnlSidebar = new Panel { Dock = DockStyle.Left, Width = 230, BackColor = BgSidebar };
-            pnlSidebar.Paint += (s, e) =>
-            {
-                using (var pen = new Pen(BorderColor))
-                    e.Graphics.DrawLine(pen, 229, 0, 229, pnlSidebar.Height);
-            };
-
-            // --- GROUPS SECTION ---
-            lblGroupsTitle = new Label
-            {
-                Text = "GROUPS",
-                Font = new Font("Segoe UI", 7.5F, FontStyle.Bold),
-                ForeColor = TextSecondary,
-                Location = new Point(14, 8),
-                AutoSize = true,
-                BackColor = Color.Transparent
-            };
-
-            lstGroups = new ListBox
-            {
-                Location = new Point(6, 28),
-                Size = new Size(218, 180),
-                BackColor = BgSidebar,
-                ForeColor = TextPrimary,
-                BorderStyle = BorderStyle.None,
-                DrawMode = DrawMode.OwnerDrawFixed,
-                ItemHeight = 36,
-                Font = new Font("Segoe UI", 9.5F)
-            };
-            lstGroups.DrawItem += LstGroups_DrawItem;
-            lstGroups.SelectedIndexChanged += LstGroups_Selected;
-
-            // Group buttons
-            btnCreateGroup = MakeSmallButton("+ Create", 6, 212, 106, 28, AccentPurple);
-            btnCreateGroup.Click += async (s, e) => await HandleCreateGroup();
-
-            btnBrowseGroups = MakeSmallButton("Browse", 118, 212, 106, 28, AccentBlue);
-            btnBrowseGroups.Click += async (s, e) => await HandleBrowseGroups();
-
-            // --- Separator ---
-            var sep = new Panel
-            {
-                Location = new Point(14, 248),
-                Size = new Size(202, 1),
-                BackColor = BorderColor
-            };
-
-            // --- DIRECT MESSAGES SECTION ---
-            lblDirectTitle = new Label
-            {
-                Text = "DIRECT MESSAGES",
-                Font = new Font("Segoe UI", 7.5F, FontStyle.Bold),
-                ForeColor = TextSecondary,
-                Location = new Point(14, 258),
-                AutoSize = true,
-                BackColor = Color.Transparent
-            };
-
-            lstUsers = new ListBox
-            {
-                Location = new Point(6, 278),
-                BackColor = BgSidebar,
-                ForeColor = TextPrimary,
-                BorderStyle = BorderStyle.None,
-                DrawMode = DrawMode.OwnerDrawFixed,
-                ItemHeight = 34,
-                Font = new Font("Segoe UI", 9.5F)
-            };
-            lstUsers.DrawItem += LstUsers_DrawItem;
-            lstUsers.SelectedIndexChanged += LstUsers_Selected;
-
-            pnlSidebar.Controls.AddRange(new Control[] {
-                lblGroupsTitle, lstGroups, btnCreateGroup, btnBrowseGroups,
-                sep, lblDirectTitle, lstUsers
-            });
-
-            // Resize users list to fill remaining space
-            pnlSidebar.Resize += (s, e) =>
-            {
-                lstUsers.Size = new Size(218, pnlSidebar.Height - 288);
-            };
-        }
-
-        private void BuildChatHeader()
-        {
-            pnlChatHeader = new Panel { Dock = DockStyle.Top, Height = 48, BackColor = BgHeader };
-            pnlChatHeader.Paint += (s, e) =>
-            {
-                using (var pen = new Pen(BorderColor))
-                    e.Graphics.DrawLine(pen, 0, 47, pnlChatHeader.Width, 47);
-            };
-
-            pnlChatDot = new Panel { Size = new Size(12, 12), Location = new Point(12, 12), BackColor = HexToColor(_activeChatColor) };
             pnlChatDot.Paint += (s, e) =>
             {
                 e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
                 using (var b = new SolidBrush(pnlChatDot.BackColor))
                     e.Graphics.FillEllipse(b, 0, 0, 11, 11);
             };
-
-            lblChatName = new Label
+            pnlHeader.Resize += (s, e) =>
             {
-                Text = "# General",
-                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
-                ForeColor = TextPrimary,
-                Location = new Point(30, 6),
-                AutoSize = true,
-                BackColor = Color.Transparent
+                lblUser.Location = new Point(pnlHeader.Width - lblUser.Width - 18, 16);
+                pnlStatusDot.Location = new Point(pnlHeader.Width - lblUser.Width - lblStatus.Width - 48, 21);
+                lblStatus.Location = new Point(pnlHeader.Width - lblUser.Width - lblStatus.Width - 34, 17);
             };
-
-            lblChatInfo = new Label
+            pnlSidebar.Resize += (s, e) =>
             {
-                Text = "",
-                Font = new Font("Segoe UI", 8F),
-                ForeColor = TextSecondary,
-                Location = new Point(30, 28),
-                AutoSize = true,
-                BackColor = Color.Transparent
+                lstUsers.Size = new Size(218, pnlSidebar.Height - 288);
             };
-
-            pnlChatHeader.Controls.AddRange(new Control[] { pnlChatDot, lblChatName, lblChatInfo });
         }
 
-        private void BuildInputArea()
+        // ==================== DESIGNER EVENT HANDLERS ====================
+
+        private async void btnSend_Click(object sender, EventArgs e) { await HandleSendMessage(); }
+        private async void btnAttach_Click(object sender, EventArgs e) { await HandleAttachment(); }
+        private async void btnCreateGroup_Click(object sender, EventArgs e) { await HandleCreateGroup(); }
+        private async void btnBrowseGroups_Click(object sender, EventArgs e) { await HandleBrowseGroups(); }
+
+        private async void txtMessage_KeyDown(object sender, KeyEventArgs e)
         {
-            pnlInput = new Panel { Dock = DockStyle.Bottom, Height = 58, BackColor = BgHeader, Padding = new Padding(8) };
-            pnlInput.Paint += (s, e) =>
+            if (e.KeyCode == Keys.Enter && !e.Shift)
             {
-                using (var pen = new Pen(BorderColor))
-                    e.Graphics.DrawLine(pen, 0, 0, pnlInput.Width, 0);
-            };
-
-            btnAttach = new Button
-            {
-                Text = "📎",
-                Size = new Size(42, 42),
-                Dock = DockStyle.Left,
-                FlatStyle = FlatStyle.Flat,
-                BackColor = BgInput,
-                ForeColor = TextPrimary,
-                Font = new Font("Segoe UI", 14F),
-                Cursor = Cursors.Hand
-            };
-            btnAttach.FlatAppearance.BorderColor = BorderColor;
-            btnAttach.FlatAppearance.BorderSize = 1;
-            btnAttach.Click += async (s, e) => await HandleAttachment();
-
-            txtMessage = new TextBox
-            {
-                Dock = DockStyle.Fill,
-                BackColor = BgInput,
-                ForeColor = TextPrimary,
-                Font = new Font("Segoe UI", 11F),
-                BorderStyle = BorderStyle.FixedSingle
-            };
-            txtMessage.KeyDown += async (s, e) =>
-            {
-                if (e.KeyCode == Keys.Enter && !e.Shift)
-                {
-                    e.SuppressKeyPress = true;
-                    await HandleSendMessage();
-                }
-            };
-
-            btnSend = new Button
-            {
-                Text = "SEND ➤",
-                Size = new Size(90, 42),
-                Dock = DockStyle.Right,
-                FlatStyle = FlatStyle.Flat,
-                BackColor = AccentPurple,
-                ForeColor = Color.White,
-                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
-                Cursor = Cursors.Hand
-            };
-            btnSend.FlatAppearance.BorderSize = 0;
-            btnSend.Click += async (s, e) => await HandleSendMessage();
-
-            var spacerL = new Panel { Dock = DockStyle.Left, Width = 6, BackColor = Color.Transparent };
-            var spacerR = new Panel { Dock = DockStyle.Right, Width = 6, BackColor = Color.Transparent };
-
-            pnlInput.Controls.Add(txtMessage);
-            pnlInput.Controls.Add(spacerL);
-            pnlInput.Controls.Add(btnAttach);
-            pnlInput.Controls.Add(spacerR);
-            pnlInput.Controls.Add(btnSend);
+                e.SuppressKeyPress = true;
+                await HandleSendMessage();
+            }
         }
 
-        private void BuildChatArea()
-        {
-            rtbChat = new RichTextBox
-            {
-                Dock = DockStyle.Fill,
-                BackColor = BgChat,
-                ForeColor = TextPrimary,
-                Font = new Font("Segoe UI", 10F),
-                ReadOnly = true,
-                BorderStyle = BorderStyle.None,
-                ScrollBars = RichTextBoxScrollBars.Vertical
-            };
-            rtbChat.MouseClick += RtbChat_MouseClick;
-        }
-
-        // ==================== EVENT HANDLERS ====================
+        // ==================== SIGNALR EVENT HANDLERS ====================
 
         private void SetupEventHandlers()
         {
@@ -456,7 +216,7 @@ namespace PulseChatClient.Forms
                 {
                     if (_activeChatType == "group" && _activeChatId == gId.ToString())
                     {
-                        AppendSystemMessage($"🟢 {username} joined this group");
+                        AppendSystemMessage($"[+] {username} joined this group");
                         await UpdateChatInfo();
                     }
                 });
@@ -468,7 +228,7 @@ namespace PulseChatClient.Forms
                 {
                     if (_activeChatType == "group" && _activeChatId == gId.ToString())
                     {
-                        AppendSystemMessage($"🔴 {username} left this group");
+                        AppendSystemMessage($"[-] {username} left this group");
                         await UpdateChatInfo();
                     }
                 });
@@ -481,7 +241,7 @@ namespace PulseChatClient.Forms
 
             _chatService.OnError += msg =>
             {
-                RunOnUI(() => AppendSystemMessage($"⚠️ {msg}"));
+                RunOnUI(() => AppendSystemMessage($"[!] {msg}"));
             };
         }
 
@@ -498,7 +258,6 @@ namespace PulseChatClient.Forms
                 RefreshGroupsList();
                 RefreshUsersList();
 
-                // Default: open General group
                 await SwitchToGroup(1, "General", "#8A60FF");
             }
             catch (Exception ex)
@@ -550,7 +309,7 @@ namespace PulseChatClient.Forms
             _activeChatName = otherUser;
             _activeChatColor = "#4EA0FF";
 
-            lblChatName.Text = $"💬 {otherUser}";
+            lblChatName.Text = $"@ {otherUser}";
             lblChatName.ForeColor = AccentBlue;
             pnlChatDot.BackColor = _onlineUsers.Contains(otherUser) ? StatusGreen : TextDim;
             pnlChatDot.Invalidate();
@@ -599,25 +358,21 @@ namespace PulseChatClient.Forms
         {
             bool isSelf = sender == _username;
 
-            // Timestamp
             rtbChat.SelectionColor = TextDim;
             rtbChat.SelectionFont = new Font("Segoe UI", 7.5F);
             rtbChat.AppendText($" [{timestamp}]  ");
 
-            // Sender name
             rtbChat.SelectionColor = isSelf ? AccentPurple : accentColor;
             rtbChat.SelectionFont = new Font("Segoe UI", 9.5F, FontStyle.Bold);
             rtbChat.AppendText(sender);
 
             if (msgType == "image")
             {
-                // WhatsApp-style: embed image inline
                 rtbChat.AppendText(Environment.NewLine);
                 await EmbedImageInline(imgPath);
             }
             else if (msgType == "file")
             {
-                // Document: show file icon + name + download link
                 string fileName = content ?? "unknown";
                 string icon = GetFileIcon(fileName);
 
@@ -633,7 +388,7 @@ namespace PulseChatClient.Forms
                 rtbChat.SelectionColor = AccentBlue;
                 rtbChat.SelectionFont = new Font("Segoe UI", 9F, FontStyle.Underline);
                 int start = rtbChat.TextLength;
-                rtbChat.AppendText("⬇ Download");
+                rtbChat.AppendText("[Download]");
                 int end = rtbChat.TextLength;
                 _fileLinks.Add(Tuple.Create(start, end, imgPath ?? "", fileName));
             }
@@ -675,13 +430,10 @@ namespace PulseChatClient.Forms
                     _imageCache[imgPath] = img;
                 }
 
-                // Resize to thumbnail (max 280x200)
                 var thumb = ResizeImage(img, 280, 200);
 
-                // Insert 3-space indent
                 rtbChat.AppendText("   ");
 
-                // Embed via Clipboard
                 Clipboard.SetImage(thumb);
                 rtbChat.ReadOnly = false;
                 rtbChat.Select(rtbChat.TextLength, 0);
@@ -723,15 +475,15 @@ namespace PulseChatClient.Forms
             string ext = Path.GetExtension(fileName).ToLower();
             switch (ext)
             {
-                case ".pdf": return "📕";
-                case ".doc": case ".docx": return "📘";
-                case ".xls": case ".xlsx": return "📗";
-                case ".ppt": case ".pptx": return "📙";
-                case ".zip": case ".rar": case ".7z": return "📦";
-                case ".txt": return "📄";
-                case ".mp3": case ".wav": case ".flac": return "🎵";
-                case ".mp4": case ".avi": case ".mkv": return "🎬";
-                default: return "📎";
+                case ".pdf": return "[PDF]";
+                case ".doc": case ".docx": return "[DOC]";
+                case ".xls": case ".xlsx": return "[XLS]";
+                case ".ppt": case ".pptx": return "[PPT]";
+                case ".zip": case ".rar": case ".7z": return "[ZIP]";
+                case ".txt": return "[TXT]";
+                case ".mp3": case ".wav": case ".flac": return "[AUD]";
+                case ".mp4": case ".avi": case ".mkv": return "[VID]";
+                default: return "[FILE]";
             }
         }
 
@@ -829,32 +581,27 @@ namespace PulseChatClient.Forms
             var item = lstGroups.Items[e.Index] as GroupListItem;
             if (item == null) return;
 
-            // Background
             Color bg = item.IsActive ? BgSelected :
                        (e.State & DrawItemState.Selected) != 0 ? BgHover : BgSidebar;
             using (var brush = new SolidBrush(bg))
                 g.FillRectangle(brush, e.Bounds);
 
-            // Left color bar for active item
             if (item.IsActive)
             {
                 using (var brush = new SolidBrush(HexToColor(item.ColorHex)))
                     g.FillRectangle(brush, e.Bounds.X, e.Bounds.Y + 4, 3, e.Bounds.Height - 8);
             }
 
-            // Colored dot
             Color dotColor = HexToColor(item.ColorHex);
             using (var brush = new SolidBrush(dotColor))
                 g.FillEllipse(brush, e.Bounds.X + 12, e.Bounds.Y + 12, 10, 10);
 
-            // Group name
             Color nameColor = item.HasUnread ? UnreadColor : TextPrimary;
             FontStyle nameStyle = item.HasUnread ? FontStyle.Bold : FontStyle.Regular;
             using (var brush = new SolidBrush(nameColor))
             using (var font = new Font("Segoe UI", 9.5F, nameStyle))
                 g.DrawString($"# {item.Name}", font, brush, e.Bounds.X + 28, e.Bounds.Y + 4);
 
-            // Member count
             using (var brush = new SolidBrush(TextDim))
             using (var font = new Font("Segoe UI", 7.5F))
                 g.DrawString($"{item.MemberCount}", font, brush, e.Bounds.X + 28, e.Bounds.Y + 20);
@@ -881,12 +628,10 @@ namespace PulseChatClient.Forms
                     g.FillRectangle(brush, e.Bounds.X, e.Bounds.Y + 4, 3, e.Bounds.Height - 8);
             }
 
-            // Online dot
             Color dotColor = item.IsOnline ? StatusGreen : TextDim;
             using (var brush = new SolidBrush(dotColor))
                 g.FillEllipse(brush, e.Bounds.X + 12, e.Bounds.Y + 11, 8, 8);
 
-            // Username
             Color nameColor = item.HasUnread ? UnreadColor : TextPrimary;
             FontStyle nameStyle = item.HasUnread ? FontStyle.Bold : FontStyle.Regular;
             using (var brush = new SolidBrush(nameColor))
@@ -1009,13 +754,11 @@ namespace PulseChatClient.Forms
             }
         }
 
-        // ==================== FILE DOWNLOAD + IMAGE CLICK ====================
+        // ==================== FILE DOWNLOAD ====================
 
         private async void RtbChat_MouseClick(object sender, MouseEventArgs e)
         {
             int idx = rtbChat.GetCharIndexFromPosition(e.Location);
-
-            // Check file download links
             foreach (var link in _fileLinks)
             {
                 if (idx >= link.Item1 && idx <= link.Item2)
@@ -1044,7 +787,7 @@ namespace PulseChatClient.Forms
                         if (data != null && data.Length > 0)
                         {
                             File.WriteAllBytes(sfd.FileName, data);
-                            AppendSystemMessage($"✅ Saved: {Path.GetFileName(sfd.FileName)}");
+                            AppendSystemMessage($"Saved: {Path.GetFileName(sfd.FileName)}");
                         }
                         else
                         {
@@ -1100,23 +843,6 @@ namespace PulseChatClient.Forms
                 return Color.FromArgb(r, g, b);
             }
             catch { return AccentPurple; }
-        }
-
-        private Button MakeSmallButton(string text, int x, int y, int w, int h, Color bgColor)
-        {
-            var btn = new Button
-            {
-                Text = text,
-                Location = new Point(x, y),
-                Size = new Size(w, h),
-                FlatStyle = FlatStyle.Flat,
-                BackColor = bgColor,
-                ForeColor = Color.White,
-                Font = new Font("Segoe UI", 8F, FontStyle.Bold),
-                Cursor = Cursors.Hand
-            };
-            btn.FlatAppearance.BorderSize = 0;
-            return btn;
         }
 
         protected override void OnFormClosing(FormClosingEventArgs e)
