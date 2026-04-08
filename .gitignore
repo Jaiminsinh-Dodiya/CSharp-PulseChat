@@ -1,0 +1,63 @@
+# ========================
+# Visual Studio / C# / .NET
+# ========================
+
+# Build outputs
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+
+# VS user files
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# VS caches
+*.VisualState.xml
+TestResult.xml
+[Tt]est[Rr]esult*/
+
+# NuGet packages (restored by setup.bat)
+packages/
+*.nupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/repositories.config
+
+# Roslyn / Analyzers
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# Publish / Build artifacts
+*.pidb
+*.pspdb
+*.svclog
+*.dbmdl
+*.publishsettings
+publish/
+
+# Windows junk
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Database files (auto-created at runtime)
+*.mdf
+*.ldf
+
+# PulseChat runtime data (auto-created)
+C:\PulseChat\
+
+# Temp / scratch files
+*.tmp
+*.log
+build_output.txt
+build_server.txt
+dll_list.txt
+nuget.exe
