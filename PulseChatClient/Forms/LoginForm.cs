@@ -73,8 +73,10 @@ namespace PulseChatClient.Forms
                 {
                     SetStatus("Login successful!", Color.FromArgb(76, 217, 100));
                     var chatForm = new ChatForm(_chatService, user);
+                    chatForm.FormClosed += (s, args) => this.Close(); // ← when chat closes, login closes too
                     chatForm.Show();
-                    this.Hide();
+                    this.Hide();   // still hide it (don't show login behind chat).
+                    // When ChatForm closes → triggers LoginForm.Close() → triggers Application.Exit()
                 }
                 else
                 {
@@ -178,6 +180,7 @@ namespace PulseChatClient.Forms
 
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
+            _chatService?.Disconnect();  // ← in case user closes login before chatting
             base.OnFormClosing(e);
             Application.Exit();
         }

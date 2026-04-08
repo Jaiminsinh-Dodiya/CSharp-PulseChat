@@ -849,6 +849,8 @@ namespace PulseChatClient.Forms
         {
             foreach (var img in _imageCache.Values) img?.Dispose();
             _imageCache.Clear();
+            _chatService?.Disconnect();   // ← kill the SignalR connection
+            Application.Exit();           // ← kill the entire app
             base.OnFormClosing(e);
         }
 
